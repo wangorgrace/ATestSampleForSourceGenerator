@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -11,13 +12,73 @@ namespace MySourceGenerator.Inspectors
 
     internal static class ClassInspector
     {
-        internal static List<PropertyToGenerator> Inspect(INamedTypeSymbol classSymbol)
+        internal static (List<PropertyToGenerator>,List<CommandToGenerator>) Inspect(INamedTypeSymbol classSymbol)
         {
+            Debugger.Launch();
             var allMembers = classSymbol.GetMembers();
             List<PropertyToGenerator> propertiesToGenerate = FindPropertiesToGenerate(allMembers.Where(e=>e is IFieldSymbol).Cast<IFieldSymbol>());
-            return propertiesToGenerate;
+            List<CommandToGenerator> commandsToGenerate = FindCommandsToGenerate(allMembers.Where(e=>e is IMethodSymbol).Cast<IMethodSymbol>(),allMembers);
+            return (propertiesToGenerate,commandsToGenerate);
 
         }
+
+        private static List<CommandToGenerator> FindCommandsToGenerate(IEnumerable<IMethodSymbol> methods, ImmutableArray<ISymbol> allMembers)
+        {
+            List<CommandToGenerator> commandsToGenerate = new();
+            foreach (var method in methods)
+            {
+                var methodAttributes = method.GetAttributes();
+                var commandAttributeData =
+                    methodAttributes.FirstOrDefault(x => x.AttributeClass.ToDisplayString() == "MySourceGenerator.Base.Attributes.CommandAttribute");
+
+
+                if (commandAttributeData is not null)
+                {
+                    var executeMethodInfo = new CommandMethod(method.Name)
+                    {
+                        HasParameter = method.Parameters.Any()
+                    };
+
+                    var commandPropertyName = $"{method.Name}Command";
+                    var canExecuteMethodName = commandAttributeData.ConstructorArguments.FirstOrDefault().Value?.ToString();
+
+                    foreach (var arg in commandAttributeData.NamedArguments)
+                    {
+                        if (arg.Key == "CanExecuteMethod")
+                        {
+                            canExecuteMethodName = arg.Value.Value?.ToString();
+                        }
+                        else if (arg.Key == "PropertyName")
+                        {
+                            commandPropertyName = arg.Value.Value?.ToString() ?? commandPropertyName;
+                        }
+                    }
+
+                    CommandMethod? canExecuteMethodInfo = null;
+
+                    if (canExecuteMethodName is not null)
+                    {
+                        var canExecuteMethodSymbol = allMembers.OfType<IMethodSymbol>().FirstOrDefault(x => x.Name == canExecuteMethodName);
+                        if (canExecuteMethodSymbol is not null)
+                        {
+                            canExecuteMethodInfo = new CommandMethod(canExecuteMethodSymbol.Name)
+                            {
+                                HasParameter = canExecuteMethodSymbol.Parameters.Any()
+                            };
+                        }
+                    }
+
+                    commandsToGenerate.Add(
+                        new CommandToGenerator(executeMethodInfo, commandPropertyName)
+                        {
+                            CanExecuteMethod = canExecuteMethodInfo
+                        });
+                }
+            }
+
+            return commandsToGenerate;
+        }
+
 
         private static List<PropertyToGenerator> FindPropertiesToGenerate(IEnumerable<IFieldSymbol> fields)
         {
@@ -66,7 +127,6 @@ namespace MySourceGenerator.Inspectors
                     }
 
                     var methodsToCall = new List<PropertyMethodCall>();
-                    Debugger.Launch();
                     var propertyCallMethodAttributes = attributeDatas.Where(x => x.AttributeClass?.ToDisplayString() == "MySourceGenerator.Base.Attributes.PropertyCallMethodAttribute").ToList();
 
                     foreach (var onChangeCallMethodAttribute in propertyCallMethodAttributes)

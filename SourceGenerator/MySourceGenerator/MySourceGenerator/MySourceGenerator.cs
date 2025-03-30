@@ -40,6 +40,8 @@ namespace MySourceGenerator
             classBuilder.CreateNameSpace(viewModelToGenerate);
             classBuilder.CreateClass(viewModelToGenerate);
             classBuilder.CreateProperties(viewModelToGenerate.PropertiesToGenerate);
+            classBuilder.CreateCommandFields(viewModelToGenerate.CommandsToGenerate);
+            classBuilder.CreateCommandProperties(viewModelToGenerate.CommandsToGenerate, "DelegateCommand");
 
             while (classBuilder.IndentLevel > 1) // Keep the namespace open for a ViewModel interface and/or a factory class
             {
@@ -86,7 +88,8 @@ namespace MySourceGenerator
                 viewModelClassSymbol.ContainingNamespace.ToDisplayString())
             {
                 ClassAccessModifier = accessModifier,
-                PropertiesToGenerate = result.ToList(),
+                PropertiesToGenerate = result.Item1.ToList(),
+                CommandsToGenerate = result.Item2.ToList(),
                 InheritFromViewModelBase = ViewModelBaseClassInspector.Inspect(viewModelClassSymbol as INamedTypeSymbol, viewModelBaseClassSymbol)
             };
             return viewModelToGenerate;

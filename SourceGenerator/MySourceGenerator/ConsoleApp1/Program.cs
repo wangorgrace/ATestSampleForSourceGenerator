@@ -19,6 +19,7 @@ namespace ConsoleApp1
         [PropertyCallMethod(nameof(DoSomething))]
         private string _name;
 
+        [Command]
         private void DoSomething()
         {
             Console.WriteLine("Hello world");

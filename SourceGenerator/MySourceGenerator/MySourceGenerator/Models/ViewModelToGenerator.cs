@@ -21,5 +21,7 @@ namespace MySourceGenerator.Models
         public bool InheritFromViewModelBase { get; set; }
 
         public List<PropertyToGenerator> PropertiesToGenerate { get; set; }
+
+        public List<CommandToGenerator> CommandsToGenerate { get; set; }
     }
 }
